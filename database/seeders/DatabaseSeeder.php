@@ -3,23 +3,38 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $accounts = [
+            [
+                'name' => 'Admin User',
+                'email' => env('SEED_ADMIN_EMAIL', 'admin@example.com'),
+                'password' => env('SEED_ADMIN_PASSWORD'),
+                'role' => 'administrator',
+            ],
+            [
+                'name' => 'Regular User',
+                'email' => env('SEED_USER_EMAIL', 'user@example.com'),
+                'password' => env('SEED_USER_PASSWORD'),
+                'role' => 'regular_user',
+            ],
+        ];
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        foreach ($accounts as $account) {
+            if (empty($account['password'])) {
+                throw new \RuntimeException(
+                    'Set SEED_ADMIN_PASSWORD and SEED_USER_PASSWORD in .env before seeding.'
+                );
+            }
+
+            User::updateOrCreate(
+                ['email' => $account['email']],
+                $account
+            );
+        }
     }
 }

@@ -3,6 +3,10 @@ import { reactive } from 'vue';
 
 defineProps({
     error: String,
+    loading: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const emit = defineEmits(['submit']);
@@ -16,24 +20,31 @@ const form = reactive({
 <template>
     <form class="card" @submit.prevent="emit('submit', { ...form })">
         <h2>Login</h2>
-        <label>Email</label>
 
+        <label>Email</label>
         <input
             v-model="form.email"
             type="email"
-            placeholder="admin@example.com"
+            placeholder="Email address"
         />
 
         <label>Password</label>
-
         <input
             v-model="form.password"
             type="password"
-            placeholder="password123"
+            placeholder="Password"
         />
 
-        <p v-if="error" class="field-error">{{ error }}</p>
+        <p v-if="error" class="field-error">
+            {{ error }}
+        </p>
 
-        <button type="submit" class="btn primary">Login</button>
+        <button
+            type="submit"
+            class="btn primary"
+            :disabled="loading"
+        >
+            {{ loading ? 'Logging in...' : 'Login' }}
+        </button>
     </form>
 </template>

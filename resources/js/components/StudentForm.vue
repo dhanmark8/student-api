@@ -1,6 +1,6 @@
 
 <script setup>
-import { reactive, watch } from 'vue';
+import { reactive, computed, watch } from 'vue';
 
 const props = defineProps({
     student: {
@@ -10,6 +10,10 @@ const props = defineProps({
     errors: {
         type: Object,
         default: () => ({}),
+    },
+    saving: {
+        type: Boolean,
+        default: false,
     },
 });
 
@@ -29,6 +33,12 @@ watch(
         Object.assign(form, student ? { ...student } : blank);
     },
     { immediate: true }
+);
+
+const canSubmit = computed(() =>
+    Object.keys(blank).every(
+        (key) => String(form[key] ?? '').trim() !== ''
+    )
 );
 </script>
 
@@ -55,13 +65,18 @@ watch(
         </p>
 
         <div class="actions">
-            <button type="submit" class="btn primary">
-                Save
+            <button
+                type="submit"
+                class="btn primary"
+                :disabled="saving || !canSubmit"
+            >
+                {{ saving ? 'Saving...' : 'Save' }}
             </button>
 
             <button
                 type="button"
                 class="btn"
+                :disabled="saving"
                 @click="emit('cancel')"
             >
                 Cancel

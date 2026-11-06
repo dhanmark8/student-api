@@ -1,100 +1,42 @@
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import api, { setToken } from './api';
+import { ref, watch, onMounted } from 'vue';
+
+import { useAuth } from './composable/useAuth';
+import { useNotify } from './composable/useNotify';
+import { useStudents } from './composable/useStudent';
+
 import LoginForm from './components/LoginForm.vue';
 import MessageBanner from './components/MessageBanner.vue';
 import StudentForm from './components/StudentForm.vue';
 import StudentTable from './components/StudentTable.vue';
 
-const user = ref(JSON.parse(localStorage.getItem('user') || 'null'));
-const students = ref([]);
+const {
+    user,
+    isLoggedIn,
+    isAdmin,
+    loggingIn,
+    loginError,
+    login,
+    logout,
+} = useAuth();
+
+const { message, notify } = useNotify();
+
+const {
+    items: students,
+    loading,
+    saving,
+    deletingId,
+    errors,
+    load,
+    save,
+    remove,
+    reset,
+} = useStudents();
+
 const editing = ref(null);
 const showForm = ref(false);
-const loading = ref(false);
-const errors = ref({});
-const loginError = ref('');
-const message = ref({ text: '', type: 'success' });
-
-const isAdmin = computed(() => user.value?.role === 'administrator');
-
-function notify(text, type = 'success') {
-    message.value = { text, type };
-    setTimeout(() => (message.value.text = ''), 4000);
-}
-
-function clearSession() {
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    user.value = null;
-    students.value = [];
-    showForm.value = false;
-}
-
-function handleError(e) {
-    const status = e.response?.status;
-
-    if (status === 401) {
-        clearSession();
-        notify('Session expired. Please log in again.', 'error');
-    } else if (status === 403) {
-        notify('You do not have permission to do that.', 'error');
-    } else if (status === 422) {
-        errors.value = e.response.data.errors || {};
-    } else if (status === 404) {
-        notify('Student not found.', 'error');
-    } else {
-        notify('Something went wrong. Please try again.', 'error');
-    }
-}
-
-async function loadStudents() {
-    loading.value = true;
-
-    try {
-        const { data } = await api.get('/students');
-        students.value = data;
-    } catch (e) {
-        handleError(e);
-    } finally {
-        loading.value = false;
-    }
-}
-
-async function login(credentials) {
-    loginError.value = '';
-
-    try {
-        const { data } = await api.post('/login', credentials);
-
-        setToken(data.token);
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-
-        user.value = data.user;
-
-        notify(`Welcome, ${data.user.name}!`);
-        await loadStudents();
-    } catch (e) {
-        const errs = e.response?.data?.errors;
-
-        loginError.value = errs
-            ? Object.values(errs)[0][0]
-            : e.response?.data?.message || 'Login failed.';
-    }
-}
-
-async function logout() {
-    try {
-        await api.post('/logout');
-    } catch (e) {
-        // token may already be invalid; clear the session anyway
-    }
-
-    clearSession();
-    notify('Logged out successfully.');
-}
 
 function openAdd() {
     editing.value = null;
@@ -114,45 +56,39 @@ function closeForm() {
     errors.value = {};
 }
 
-async function saveStudent(form) {
-    errors.value = {};
+async function handleLogin(credentials) {
+    const ok = await login(credentials);
 
-    try {
-        if (editing.value) {
-            await api.put(`/students/${editing.value.id}`, form);
-            notify('Student updated successfully.');
-        } else {
-            await api.post('/students', form);
-            notify('Student added successfully.');
-        }
+    if (ok) {
+        notify(`Welcome, ${user.value.name}!`);
+        await load();
+    }
+}
 
+async function handleLogout() {
+    await logout();
+    notify('Logged out successfully.');
+}
+
+async function handleSave(form) {
+    const ok = await save(form, editing.value?.id);
+
+    if (ok) {
         closeForm();
-        await loadStudents();
-    } catch (e) {
-        handleError(e);
     }
 }
 
-async function removeStudent(student) {
-    if (!confirm(`Delete ${student.name}?`)) return;
-
-    try {
-        await api.delete(`/students/${student.id}`);
-        notify('Student deleted successfully.');
-        await loadStudents();
-    } catch (e) {
-        handleError(e);
+// When the session ends (logout or expired token), clear the screen state
+watch(isLoggedIn, (loggedIn) => {
+    if (!loggedIn) {
+        reset();
+        closeForm();
     }
-}
+});
 
 onMounted(() => {
-    const token = localStorage.getItem('token');
-
-    if (token && user.value) {
-        setToken(token);
-        loadStudents();
-    } else {
-        clearSession();
+    if (isLoggedIn.value) {
+        load();
     }
 });
 </script>
@@ -162,10 +98,16 @@ onMounted(() => {
         <header class="sidebar">
             <h1>Student Management</h1>
 
-            <div v-if="user" class="user-info">
+            <div v-if="isLoggedIn" class="user-info">
                 <span>{{ user.name }}</span>
-                <span class="badge">{{ user.role }}</span>
-                <button class="btn" @click="logout">Logout</button>
+
+                <span class="badge">
+                    {{ isAdmin ? 'Administrator' : 'Regular User' }}
+                </span>
+
+                <button class="btn" @click="handleLogout">
+                    Logout
+                </button>
             </div>
         </header>
 
@@ -176,12 +118,18 @@ onMounted(() => {
             />
 
             <LoginForm
-                v-if="!user"
+                v-if="!isLoggedIn"
                 :error="loginError"
-                @submit="login"
+                :loading="loggingIn"
+                @submit="handleLogin"
             />
 
             <template v-else>
+                <p v-if="!isAdmin" class="banner info">
+                    You are logged in as a Regular User.
+                    You can view student records only.
+                </p>
+
                 <div class="records-heading">
                     <h2>Student Records</h2>
                     <button
@@ -197,7 +145,8 @@ onMounted(() => {
                     v-if="showForm"
                     :student="editing"
                     :errors="errors"
-                    @save="saveStudent"
+                    :saving="saving"
+                    @save="handleSave"
                     @cancel="closeForm"
                 />
 
@@ -205,8 +154,9 @@ onMounted(() => {
                     :students="students"
                     :is-admin="isAdmin"
                     :loading="loading"
+                    :deleting-id="deletingId"
                     @edit="openEdit"
-                    @remove="removeStudent"
+                    @remove="remove"
                 />
             </template>
         </main>

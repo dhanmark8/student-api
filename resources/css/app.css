@@ -73,6 +73,7 @@ td.actions .btn + .btn { margin-left: 8px; }
 .banner { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; }
 .banner.success { background: #e1f2e6; color: #1b6540; }
 .banner.error { background: #ffebe5; color: #a9432f; }
+.banner.info { background: #e5eee9; color: #28574c; }
 .user-info { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; font-weight: 700; }
 .user-info .btn { margin-top: 10px; background: transparent; color: #fff; border-color: #a9c9bc; }
 .user-info .btn:hover { background: #286459; }

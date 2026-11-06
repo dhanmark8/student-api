@@ -56,3 +56,8 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Seeded accounts
+Admin and regular user accounts are created by `php artisan migrate --seed`.
+Set `SEED_ADMIN_PASSWORD` and `SEED_USER_PASSWORD` in your own `.env` first
+(see `.env.example`). Credentials are not stored in this repository.
